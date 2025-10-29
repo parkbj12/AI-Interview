@@ -1,13 +1,15 @@
 package com.example.interview_ai.model;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.Instant;
 
-@Getter @Setter
-@Builder
-@NoArgsConstructor
+@Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class Answer {
-    private int qno;          // 어떤 질문(qno)에 대한 답변인지 매핑
-    private String text;      // 사용자의 답변 텍스트
-    private Integer durationSec; // (선택) 답변에 걸린 시간(초) - 향후 음성 기능 대비
+    private int questionId;     // 질문 번호
+    private String content;     // 사용자의 답변
+    private Instant createdAt;  // 답변 작성 시간
 }

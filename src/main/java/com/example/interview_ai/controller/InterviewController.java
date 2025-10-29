@@ -1,5 +1,6 @@
 package com.example.interview_ai.controller;
 
+import com.example.interview_ai.model.Answer;
 import com.example.interview_ai.model.InterviewSession;
 import com.example.interview_ai.service.InterviewService;
 import lombok.RequiredArgsConstructor;
@@ -38,4 +39,9 @@ public class InterviewController {
     public InterviewSession getSessionById(@PathVariable String id) {
         return interviewService.getSessionById(id);
     }
+    @PostMapping("/answer")
+    public InterviewSession saveAnswer(@RequestParam String sessionId, @RequestBody Answer answer) {
+        return interviewService.saveAnswer(sessionId, answer);
+    }
+
 }
