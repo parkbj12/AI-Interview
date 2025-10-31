@@ -1,0 +1,128 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body{
+  margin: 0 auto;
+  width: 90%;
+}
+
+.home{
+  width: 100px;
+  margin: 0 auto; 
+}
+
+h1{
+  font-size: 64px;
+}
+
+.account-manage{
+  width: 20%;
+  flex-direction: row-reverse;
+  display: inline-flex;
+  /* justify-content: space-evenly; */
+  float: right;
+}
+
+.account-manage span{
+  margin: 0 10px;
+}
+
+.admin{
+  display: inline-flex;
+  float: left;
+  width: 20%;
+}
+
+.menu-bar{
+  margin: 0 auto;
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: space-evenly;
+  width: 90%;
+}
+
+.menu-bar li{
+  width: 40%;
+  margin: 0 25px;
+  list-style: none;
+  border: solid;
+  border-color: #282c34;
+  background-color: white;
+}
+
+a{
+  text-decoration: none;
+  color: teal;
+}
+a:visited{
+  text-decoration: none;
+  color: teal;
+}
+.home{
+  color: black;
+}
+
+.home a:visited{
+  text-decoration: none;
+  color: black;
+}
+.chat{
+  margin: 0 auto;
+  margin-top: 40px;
+  width: 80%;
+  border-width: 1px;
+  border-color: #282c34;
+  border: solid;
+  background-color: white;
+}
+
+.ai-side{
+  text-align: left;
+}
+.ai-side p{
+  margin-left: 20px;
+  margin-right: auto;
+}
+.user-side{
+  text-align: right;  
+}
+.user-side p{
+  margin-right: 20px;
+  margin-left: auto;
+}
