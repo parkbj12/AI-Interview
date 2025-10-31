@@ -15,12 +15,8 @@ public class InterviewSession {
 
     @Id
     private String id;
-
     private String job;
     private List<Question> questions;
-
-    // ✅ 추가
     private List<Answer> answers;
-
     private Instant createdAt;
 }

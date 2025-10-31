@@ -51,6 +51,8 @@ h1{
   font-size: 64px;
 }
 
+
+
 .account-manage{
   width: 20%;
   flex-direction: row-reverse;
@@ -80,29 +82,14 @@ h1{
 .menu-bar li{
   width: 40%;
   margin: 0 25px;
+  padding: 10px;
   list-style: none;
   border: solid;
   border-color: #282c34;
   background-color: white;
 }
 
-a{
-  text-decoration: none;
-  color: teal;
-}
-a:visited{
-  text-decoration: none;
-  color: teal;
-}
-.home{
-  color: black;
-}
-
-.home a:visited{
-  text-decoration: none;
-  color: black;
-}
-.chat{
+.recommand-box{
   margin: 0 auto;
   margin-top: 40px;
   width: 80%;
@@ -112,7 +99,14 @@ a:visited{
   background-color: white;
 }
 
-.ai-side{
+.recommand-box h3{
+  text-align: left;
+  margin-left: 2%;
+}
+
+
+
+/* .ai-side{
   text-align: left;
 }
 .ai-side p{
@@ -125,4 +119,13 @@ a:visited{
 .user-side p{
   margin-right: 20px;
   margin-left: auto;
+} */
+
+.job-type{
+  text-align: left;
+  margin: 30px 0px;
+}
+.dash-deco{
+  margin: 0;
+  padding: 0 100px;
 }
