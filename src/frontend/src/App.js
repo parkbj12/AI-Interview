@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Link, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "../context/AuthContext";
 import Home from "../pages/Home";
 import Interview from "../pages/Interview";
 import VideoInterview from "../pages/VideoInterview";
