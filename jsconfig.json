@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "baseUrl": "src",
+    "baseUrl": "./src/frontend/src",
     "jsx": "react",
     "module": "esnext",
     "target": "es5",
