@@ -31,6 +31,14 @@ yarn-error.log*
 
 # Environment variables
 .env
+backend-example/.env
+
+# SSL Certificates (보안상 중요)
+*.crt
+*.key
+*.pem
+backend-example/certs/
+backend-example/backend-example/certs/
 
 # Gradle
 .gradle/
