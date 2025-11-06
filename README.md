@@ -40,7 +40,6 @@
 - **PDF 다운로드**: 면접 기록 PDF로 다운로드 가능
 
 ### 📚 질문 관리
-- **질문 뱅크**: 다양한 직무별 면접 질문 제공
 - **커스텀 질문**: 사용자 정의 질문 추가 및 관리
 - **회사별 질문**: 특정 회사의 면접 질문 생성
 
@@ -88,7 +87,12 @@ npm install
 3. **환경 변수 설정**
 프로젝트 루트에 `.env` 파일 생성:
 ```env
+# 로컬 개발 시
 REACT_APP_API_URL=http://localhost:3001/api
+
+# 다른 컴퓨터에서 접속하는 경우, 백엔드 서버의 IP 주소로 변경
+# 예: REACT_APP_API_URL=http://192.168.1.100:3001/api
+# 백엔드 서버 실행 시 콘솔에 표시되는 "네트워크" URL을 사용하세요
 ```
 
 4. **개발 서버 실행**
@@ -131,7 +135,6 @@ frontend/
 │   │   ├── Feedback.jsx
 │   │   ├── MyPage.jsx
 │   │   ├── Statistics.jsx
-│   │   ├── QuestionBank.jsx
 │   │   ├── CustomQuestions.jsx
 │   │   ├── InterviewDetail.jsx
 │   │   └── Guide.jsx
@@ -152,7 +155,6 @@ frontend/
 - **홈 (`/`)**: 서비스 소개 및 면접 시작
 - **로그인 (`/login`)**: 사용자 로그인
 - **회원가입 (`/signup`)**: 신규 사용자 가입
-- **질문 뱅크 (`/questions`)**: 면접 질문 모음
 - **가이드 (`/guide`)**: 사용 가이드
 
 ### 인증 필요 페이지
