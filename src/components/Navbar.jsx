@@ -20,6 +20,12 @@ const Navbar = () => {
         <div className="navbar-menu">
           {isAuthenticated ? (
             <>
+              <Link to="/interview" className="navbar-link">
+                텍스트 면접
+              </Link>
+              <Link to="/video-interview" className="navbar-link">
+                비디오 면접
+              </Link>
               <Link to="/company-interview" className="navbar-link">
                 AI 질문 생성
               </Link>

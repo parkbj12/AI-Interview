@@ -12,8 +12,8 @@
     "jspdf": "^2.5.1"
   },
   "scripts": {
-    "start": "set HTTPS=true&&react-scripts start",
-    "start:http": "react-scripts start",
+    "start": "set HTTPS=true&&set HOST=0.0.0.0&&react-scripts start",
+    "start:http": "set HOST=0.0.0.0&&react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

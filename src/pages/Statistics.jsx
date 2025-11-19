@@ -177,24 +177,36 @@ const Statistics = () => {
                       {interview.companyName ? `${interview.companyName} - ` : ''}
                       {interview.job || '직무 미지정'}
                     </h3>
-                    {interview.interviewType && (
-                      <span style={{
-                        display: 'inline-block',
-                        marginTop: '0.25rem',
-                        padding: '0.25rem 0.5rem',
-                        backgroundColor: interview.interviewType === 'video' 
-                          ? 'rgba(139, 92, 246, 0.1)' 
-                          : 'rgba(99, 102, 241, 0.1)',
-                        color: interview.interviewType === 'video' 
-                          ? '#8b5cf6' 
-                          : '#6366f1',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '0.75rem',
-                        fontWeight: 500
-                      }}>
-                        {interview.interviewType === 'video' ? '🎥 영상' : '📝 텍스트'}
-                      </span>
-                    )}
+                    {(() => {
+                      // interviewType이 없으면 answers를 확인해서 자동으로 판단
+                      let interviewType = interview.interviewType;
+                      if (!interviewType && interview.answers && Array.isArray(interview.answers)) {
+                        const hasAudioAnswer = interview.answers.some(answer => 
+                          answer && typeof answer === 'object' && (answer.type === 'audio' || answer.base64Audio)
+                        );
+                        interviewType = hasAudioAnswer ? 'video' : 'text';
+                      }
+                      if (!interviewType) interviewType = 'text';
+                      
+                      return (
+                        <span style={{
+                          display: 'inline-block',
+                          marginTop: '0.25rem',
+                          padding: '0.25rem 0.5rem',
+                          backgroundColor: interviewType === 'video' 
+                            ? 'rgba(139, 92, 246, 0.1)' 
+                            : 'rgba(99, 102, 241, 0.1)',
+                          color: interviewType === 'video' 
+                            ? '#8b5cf6' 
+                            : '#6366f1',
+                          borderRadius: 'var(--radius-sm)',
+                          fontSize: '0.75rem',
+                          fontWeight: 500
+                        }}>
+                          {interviewType === 'video' ? '🎥 영상' : '📝 텍스트'}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <span style={{
                     fontSize: '1.5rem',

@@ -51,6 +51,23 @@ const InterviewDetail = () => {
         console.log('로컬 스토리지 면접 기록:', localStorage.getItem('interviews'));
       }
       
+      // interviewType이 없으면 answers를 확인해서 자동으로 판단
+      if (found && !found.interviewType) {
+        // answers가 객체 배열이고 type이 'audio'인 경우 비디오 면접으로 판단
+        if (found.answers && Array.isArray(found.answers)) {
+          const hasAudioAnswer = found.answers.some(answer => 
+            answer && typeof answer === 'object' && (answer.type === 'audio' || answer.base64Audio)
+          );
+          if (hasAudioAnswer) {
+            found.interviewType = 'video';
+          } else {
+            found.interviewType = 'text';
+          }
+        } else {
+          found.interviewType = 'text';
+        }
+      }
+      
       setInterview(found);
     } catch (error) {
       console.error('면접 상세 로드 오류:', error);
@@ -127,8 +144,9 @@ const InterviewDetail = () => {
         border: '1px solid var(--border-color)'
       }}>
         <h2 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.5rem' }}>
-          {interview.companyName ? `${interview.companyName} - ` : ''}
-          {interview.job || '직무 미지정'}
+          {interview.companyName && interview.companyName.trim() 
+            ? `${interview.companyName} - ${interview.job || '직무 미지정'}` 
+            : interview.job || '직무 미지정'}
         </h2>
         
         <div style={{
@@ -162,14 +180,12 @@ const InterviewDetail = () => {
             </div>
           )}
           
-          {interview.interviewType && (
-            <div>
-              <strong style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>📝 면접 타입</strong>
-              <p style={{ margin: '0.5rem 0 0 0', fontSize: '1rem' }}>
-                {interview.interviewType === 'video' ? '🎥 영상 면접' : '📝 텍스트 면접'}
-              </p>
-            </div>
-          )}
+          <div>
+            <strong style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>📝 면접 타입</strong>
+            <p style={{ margin: '0.5rem 0 0 0', fontSize: '1rem' }}>
+              {interview.interviewType === 'video' ? '🎥 영상 면접' : '📝 텍스트 면접'}
+            </p>
+          </div>
           
           {interview.score !== undefined && (
             <div>

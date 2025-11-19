@@ -149,6 +149,105 @@ frontend/
 └── README.md
 ```
 
+## 🗄️ 데이터베이스 ERD (Entity Relationship Diagram)
+
+```mermaid
+erDiagram
+    User ||--o{ Interview : "has"
+    User ||--o{ Question : "creates"
+    User ||--o{ Comment : "writes"
+    Question ||--o{ Comment : "has"
+    
+    User {
+        ObjectId _id PK
+        string name
+        string email UK
+        string password
+        date createdAt
+    }
+    
+    Interview {
+        ObjectId _id PK
+        ObjectId userId FK
+        string job
+        string difficulty
+        string mode
+        string companyName
+        array questions
+        mixed answers
+        array feedbacks
+        number score
+        string interviewType
+        date createdAt
+    }
+    
+    Question {
+        ObjectId _id PK
+        ObjectId userId FK
+        string userName
+        string title
+        string content
+        array images
+        date createdAt
+        date updatedAt
+    }
+    
+    Comment {
+        ObjectId _id PK
+        ObjectId postId FK
+        ObjectId userId FK
+        string userName
+        string text
+        date createdAt
+        date updatedAt
+    }
+```
+
+### 엔티티 설명
+
+#### User (사용자)
+- **역할**: 시스템 사용자 정보 저장
+- **주요 필드**:
+  - `email`: 고유 이메일 주소 (unique)
+  - `password`: 해시된 비밀번호
+  - `name`: 사용자 이름
+
+#### Interview (면접 기록)
+- **역할**: 사용자의 면접 기록 저장
+- **주요 필드**:
+  - `userId`: 사용자 참조 (1:N 관계)
+  - `job`: 직무
+  - `difficulty`: 난이도 (초급/중급/고급)
+  - `mode`: 면접 모드 (연습/실전)
+  - `companyName`: 회사명
+  - `questions`: 질문 목록
+  - `answers`: 답변 (텍스트 또는 비디오)
+  - `feedbacks`: AI 피드백 배열
+  - `score`: 전체 점수
+  - `interviewType`: 면접 타입 (text/video)
+
+#### Question (커뮤니티 질문)
+- **역할**: 사용자가 작성한 커뮤니티 질문 저장
+- **주요 필드**:
+  - `userId`: 작성자 참조 (1:N 관계)
+  - `title`: 질문 제목
+  - `content`: 질문 내용
+  - `images`: 첨부 이미지 (base64 배열)
+
+#### Comment (댓글)
+- **역할**: 질문에 대한 댓글 저장
+- **주요 필드**:
+  - `postId`: 질문 참조 (1:N 관계)
+  - `userId`: 작성자 참조 (1:N 관계)
+  - `text`: 댓글 내용
+
+### 관계 설명
+
+- **User ↔ Interview**: 1:N (한 사용자가 여러 면접 기록 보유)
+- **User ↔ Question**: 1:N (한 사용자가 여러 질문 작성)
+- **User ↔ Comment**: 1:N (한 사용자가 여러 댓글 작성)
+- **Question ↔ Comment**: 1:N (한 질문에 여러 댓글)
+
 ## 📄 주요 페이지
 
 ### 공개 페이지

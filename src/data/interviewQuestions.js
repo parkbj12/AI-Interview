@@ -218,13 +218,31 @@ export const interviewQuestions = {
   ],
 };
 
-// 직무별 질문 가져오기
-export const getQuestionsByJob = (job, count = 10) => {
+// 질문 인덱스를 기반으로 난이도 할당
+// 1번: 초급, 2-4번: 초급-중급, 5-7번: 중급, 8-10번: 고급
+const getDifficultyByIndex = (index) => {
+  if (index === 0) return 'easy'; // 자기소개는 항상 초급
+  if (index >= 1 && index <= 3) return 'easy'; // 초급
+  if (index >= 4 && index <= 6) return 'medium'; // 중급
+  return 'hard'; // 고급 (7-9)
+};
+
+// 직무별 질문 가져오기 (난이도 필터링 지원)
+export const getQuestionsByJob = (job, count = 10, difficulty = null) => {
   const questions = interviewQuestions[job] || [];
-  // 항상 10개 모두 반환 (프론트엔드에서 랜덤 선택)
-  return questions.map((text, index) => ({
+  // 난이도별로 질문에 난이도 필드 추가
+  let questionsWithDifficulty = questions.map((text, index) => ({
     text,
     id: index + 1,
+    difficulty: getDifficultyByIndex(index),
   }));
+  
+  // 난이도 필터링
+  if (difficulty) {
+    questionsWithDifficulty = questionsWithDifficulty.filter(q => q.difficulty === difficulty);
+  }
+  
+  // 항상 요청한 개수만큼 반환 (프론트엔드에서 랜덤 선택)
+  return questionsWithDifficulty;
 };
 

@@ -559,13 +559,30 @@ const MyPage = () => {
                 return (
                   <div key={interviewId} className="interview-item">
                     <div className="interview-item-header">
-                      <h3>{interview.companyName ? `${interview.companyName} - ` : ''}{interview.job}</h3>
+                      <h3>
+                        {interview.companyName && interview.companyName.trim() 
+                          ? `${interview.companyName} - ${interview.job}` 
+                          : interview.job || '직무 미지정'}
+                      </h3>
                       <span className="interview-score">{interview.score}/10</span>
                     </div>
                     <div className="interview-item-info">
                       <p>📅 날짜: {new Date(interview.date || interview.createdAt).toLocaleDateString('ko-KR')}</p>
                       <p>📊 난이도: {interview.difficulty === 'easy' ? '초급' : interview.difficulty === 'medium' ? '중급' : '고급'}</p>
                       <p>📝 질문 수: {interview.questions?.length || 0}개</p>
+                      <p>
+                        {(() => {
+                          // interviewType이 없으면 answers를 확인해서 자동으로 판단
+                          let interviewType = interview.interviewType;
+                          if (!interviewType && interview.answers && Array.isArray(interview.answers)) {
+                            const hasAudioAnswer = interview.answers.some(answer => 
+                              answer && typeof answer === 'object' && (answer.type === 'audio' || answer.base64Audio)
+                            );
+                            interviewType = hasAudioAnswer ? 'video' : 'text';
+                          }
+                          return interviewType === 'video' ? '🎥 영상 면접' : '📝 텍스트 면접';
+                        })()}
+                      </p>
                     </div>
                     <div className="interview-item-actions">
                       <Link to={`/interview/${interviewId}`} className="btn btn-primary">

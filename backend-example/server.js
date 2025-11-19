@@ -12,10 +12,8 @@ const { OpenAI } = require('openai');
 // .env 파일 로드
 const envPath = require('path').join(__dirname, '.env');
 if (fs.existsSync(envPath)) {
-  console.log('✅ .env 파일 발견:', envPath);
   dotenv.config({ path: envPath });
 } else {
-  console.warn('⚠️ .env 파일을 찾을 수 없습니다:', envPath);
   dotenv.config();
 }
 
@@ -30,8 +28,6 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // MongoDB 연결 (선택사항)
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/interview';
-console.log('🔍 MONGODB_URI:', process.env.MONGODB_URI ? '환경 변수에서 로드됨' : '기본값 사용');
-console.log('🔗 연결 URI:', MONGODB_URI.substring(0, 50) + '...');
 let isMongoConnected = false;
 
 // MongoDB 연결 함수 (재시도 로직 포함)
@@ -42,91 +38,49 @@ const connectMongoDB = async (isRetry = false) => {
   try {
     if (isRetry) {
       reconnectAttempts++;
-      console.log(`🔄 MongoDB 재연결 시도 중... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
     } else {
-      console.log('🔄 MongoDB 연결 시도 중...');
       reconnectAttempts = 0;
     }
     
-    // MongoDB 연결 옵션 개선 (DNS 쿼리 실패 대응)
     const mongooseOptions = {
-      serverSelectionTimeoutMS: 30000, // 30초
+      serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
       connectTimeoutMS: 30000,
-      // DNS 쿼리 실패 시 재시도 옵션
       retryWrites: true,
       retryReads: true,
-      // Windows 환경에서 DNS 쿼리 문제 해결을 위한 옵션
-      directConnection: false, // SRV 레코드 사용
-      // 자동 재연결 비활성화 (수동으로 제어)
+      directConnection: false,
       autoIndex: true,
     };
     
-    // Windows 환경에서 DNS 문제가 있는 경우를 위한 추가 옵션
     if (process.platform === 'win32') {
-      // DNS 쿼리 타임아웃 증가
-      mongooseOptions.serverSelectionTimeoutMS = 60000; // 60초
+      mongooseOptions.serverSelectionTimeoutMS = 60000;
       mongooseOptions.connectTimeoutMS = 60000;
     }
     
-    // 재시도 시 타임아웃 증가
     if (isRetry && reconnectAttempts > 3) {
-      mongooseOptions.serverSelectionTimeoutMS = 90000; // 90초
+      mongooseOptions.serverSelectionTimeoutMS = 90000;
       mongooseOptions.connectTimeoutMS = 90000;
     }
     
     await mongoose.connect(MONGODB_URI, mongooseOptions);
-    console.log('✅ MongoDB 연결 성공');
-    console.log(`📋 데이터베이스: ${mongoose.connection.db.databaseName}`);
-    console.log(`🔗 연결 상태: ${mongoose.connection.readyState === 1 ? '연결됨' : '연결 안됨'}`);
     isMongoConnected = true;
-    reconnectAttempts = 0; // 성공 시 재시도 카운터 리셋
+    reconnectAttempts = 0;
   } catch (err) {
-    console.error('❌ MongoDB 연결 실패:', err.message);
-    console.error('❌ 연결 오류 상세:', err.name);
-    console.error('❌ 오류 코드:', err.code);
-    
-    if (err.code === 'ENOTFOUND' || err.name === 'MongoServerSelectionError') {
-      console.error('\n💡 DNS/네트워크 오류 해결 방법:');
-      console.error('   1. 인터넷 연결 상태 확인');
-      console.error('   2. DNS 서버를 Google DNS(8.8.8.8)로 변경:');
-      console.error('      - 제어판 > 네트워크 및 공유 센터 > 어댑터 설정');
-      console.error('      - 네트워크 어댑터 우클릭 > 속성 > IPv4 속성');
-      console.error('      - 다음 DNS 서버 주소 사용: 8.8.8.8, 8.8.4.4');
-      console.error('   3. PowerShell을 관리자 권한으로 실행하여 DNS 캐시 초기화:');
-      console.error('      ipconfig /flushdns');
-      console.error('   4. MongoDB Atlas 클러스터가 활성화되어 있는지 확인');
-      console.error('   5. VPN이나 방화벽이 DNS 쿼리를 차단하는지 확인');
-      console.error('   6. MongoDB Atlas 대시보드에서 클러스터 상태 확인');
-      console.error('   7. MongoDB Atlas IP 화이트리스트에 0.0.0.0/0 (모든 IP 허용) 추가 확인');
-    } else if (err.name === 'MongoServerSelectionError' || err.code === 'ENOTFOUND') {
-      console.error('\n💡 추가 해결 방법:');
-      console.error('   1. MongoDB Atlas IP 화이트리스트에 현재 IP가 추가되었는지 확인');
-      console.error('   2. 사용자명과 비밀번호가 올바른지 확인');
-      console.error('   3. 네트워크 연결 상태 확인');
-      console.error('   4. MongoDB Atlas 클러스터 URI가 올바른지 확인');
-    }
+    console.error('MongoDB 연결 실패:', err.message);
     
     if (!isRetry) {
-      console.log('\n📝 로컬 메모리 모드로 작동합니다 (데이터는 서버 재시작 시 초기화됩니다)');
+      console.log('로컬 메모리 모드로 작동합니다 (데이터는 서버 재시작 시 초기화됩니다)');
     }
     
     isMongoConnected = false;
     
-    // 재연결 시도 (최대 시도 횟수 제한)
     if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-      // 재시도 간격: 첫 번째는 10초, 이후는 점진적으로 증가 (최대 60초)
       const retryDelay = Math.min(10000 * Math.pow(1.5, reconnectAttempts), 60000);
-      console.log(`⏳ ${Math.round(retryDelay / 1000)}초 후 재연결 시도...`);
-      
       setTimeout(() => {
         if (mongoose.connection.readyState === 0) {
-          connectMongoDB(true); // 재시도 플래그 전달
+          connectMongoDB(true);
         }
       }, retryDelay);
-    } else {
-      console.error(`\n❌ 최대 재연결 시도 횟수(${MAX_RECONNECT_ATTEMPTS})에 도달했습니다.`);
-      console.error('💡 수동으로 서버를 재시작하거나 네트워크 설정을 확인하세요.');
     }
   }
 };
@@ -136,25 +90,17 @@ connectMongoDB();
 
 // MongoDB 연결 상태 이벤트 리스너
 mongoose.connection.on('connected', () => {
-  console.log('✅ MongoDB 연결됨');
   isMongoConnected = true;
-  reconnectAttempts = 0; // 연결 성공 시 재시도 카운터 리셋
+  reconnectAttempts = 0;
 });
 
 mongoose.connection.on('error', (err) => {
-  console.error('❌ MongoDB 연결 오류:', err);
+  console.error('MongoDB 연결 오류:', err);
   isMongoConnected = false;
-  
-  // 재연결은 connectMongoDB 함수 내부에서 처리되므로 여기서는 추가 시도하지 않음
-  // (중복 재연결 방지)
 });
 
 mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️ MongoDB 연결 끊김');
   isMongoConnected = false;
-  
-  // 재연결은 connectMongoDB 함수 내부에서 처리되므로 여기서는 추가 시도하지 않음
-  // (중복 재연결 방지)
 });
 
 // 메모리 저장소 (MongoDB 없이 사용)
@@ -178,10 +124,12 @@ const InterviewSchema = new mongoose.Schema({
   job: String,
   difficulty: String,
   mode: String,
+  companyName: String, // 회사명 추가
   questions: [String],
-  answers: [String],
+  answers: mongoose.Schema.Types.Mixed, // 비디오 면접의 객체 배열도 지원하도록 Mixed 타입으로 변경
   feedbacks: [Object],
   score: Number,
+  interviewType: { type: String, default: 'text' }, // 영상 면접인지 텍스트 면접인지 구분
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -220,19 +168,14 @@ const dbOperations = {
       try {
         const user = new User(userData);
         const savedUser = await user.save();
-        console.log(`💾 MongoDB에 사용자 저장 완료: ${savedUser.email} (ID: ${savedUser._id})`);
-        console.log(`📊 데이터베이스: ${mongoose.connection.db.databaseName}, 컬렉션: users`);
         return savedUser;
       } catch (error) {
-        console.error('❌ MongoDB 저장 오류:', error);
-        console.error('❌ 오류 상세:', error.message);
+        console.error('MongoDB 저장 오류:', error);
         throw error;
       }
     } else {
-      console.warn(`⚠️ MongoDB 연결 안됨 (readyState: ${mongoose.connection.readyState}), 메모리에 저장`);
       const user = { ...userData, _id: Date.now().toString(), createdAt: new Date() };
       memoryStore.users.push(user);
-      console.log(`💾 메모리에 사용자 저장: ${user.email}`);
       return user;
     }
   },
@@ -259,47 +202,29 @@ const dbOperations = {
           delete mongoQuery.id;
         }
         
-        // _id가 있지만 ObjectId 형식이 아니면 제거하고 email로만 조회
         if (mongoQuery._id && !isValidObjectId(mongoQuery._id)) {
-          console.warn(`⚠️ 잘못된 ObjectId 형식: ${mongoQuery._id}, email로만 조회합니다.`);
           delete mongoQuery._id;
         }
         
         const user = await User.findOne(mongoQuery);
-        if (user) {
-          console.log(`🔍 MongoDB에서 사용자 찾음: ${user.email}`);
-        } else {
-          console.log(`🔍 MongoDB에서 사용자 없음:`, query);
-        }
         return user;
       } catch (error) {
-        console.error('❌ MongoDB 조회 오류:', error);
-        // ObjectId 형식 오류인 경우 email로만 재시도
         if (error.name === 'CastError' && error.path === '_id' && query.email) {
-          console.log('🔄 ObjectId 오류로 email로만 재조회 시도');
           try {
-            const user = await User.findOne({ email: query.email });
-            if (user) {
-              console.log(`🔍 MongoDB에서 사용자 찾음 (email로): ${user.email}`);
-            }
-            return user;
+            return await User.findOne({ email: query.email });
           } catch (retryError) {
-            console.error('❌ 재조회 오류:', retryError);
+            console.error('재조회 오류:', retryError);
           }
         }
         throw error;
       }
     } else {
-      const user = memoryStore.users.find(u => {
+      return memoryStore.users.find(u => {
         if (query.email) return u.email === query.email;
         if (query._id) return u._id === query._id || u.id === query._id;
         if (query.id) return u._id === query.id || u.id === query.id;
         return false;
       });
-      if (user) {
-        console.log(`🔍 메모리에서 사용자 찾음: ${user.email}`);
-      }
-      return user;
     }
   },
   
@@ -496,7 +421,6 @@ const dbOperations = {
       if (index !== -1) {
         const deleted = memoryStore.interviews[index];
         memoryStore.interviews.splice(index, 1);
-        console.log(`🗑️ 메모리에서 면접 기록 삭제: ${interviewId}`);
         return deleted;
       }
       return null;
@@ -630,13 +554,7 @@ const dbOperations = {
 };
 
 // OpenAI 설정
-// OpenAI API 키 확인 및 초기화
 const openaiApiKey = process.env.OPENAI_API_KEY?.trim();
-if (openaiApiKey) {
-  console.log('✅ OpenAI API 키 로드됨:', openaiApiKey.substring(0, 20) + '...');
-} else {
-  console.warn('⚠️ OpenAI API 키가 설정되지 않았습니다.');
-}
 
 const openai = new OpenAI({
   apiKey: openaiApiKey,
@@ -647,36 +565,18 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  // 디버깅 로그
-  console.log('🔍 인증 요청:', {
-    url: req.originalUrl,
-    method: req.method,
-    hasAuthHeader: !!authHeader,
-    tokenExists: !!token,
-    tokenType: token === 'local-token' ? 'local-token' : token ? 'JWT' : 'none',
-    tokenPreview: token && token !== 'local-token' ? token.substring(0, 20) + '...' : token,
-  });
-
   if (!token) {
-    console.warn('❌ 토큰이 없습니다');
     return res.status(401).json({ message: '인증 토큰이 필요합니다.' });
   }
 
-  // local-token은 검증하지 않음 (로컬 모드)
   if (token === 'local-token') {
-    console.warn('⚠️ 로컬 토큰은 백엔드에서 검증할 수 없습니다');
     return res.status(403).json({ message: '유효하지 않은 토큰입니다.' });
   }
 
   jwt.verify(token, process.env.JWT_SECRET || 'secret', (err, user) => {
     if (err) {
-      console.error('❌ JWT 검증 실패:', {
-        error: err.message,
-        tokenPreview: token.substring(0, 20) + '...',
-      });
       return res.status(403).json({ message: '유효하지 않은 토큰입니다.' });
     }
-    console.log('✅ JWT 검증 성공:', { userId: user.userId });
     req.user = user;
     next();
   });
@@ -698,16 +598,13 @@ app.post('/api/auth/signup', async (req, res) => {
 
     const token = jwt.sign({ userId: user._id || user.id }, process.env.JWT_SECRET || 'secret');
     
-    // 저장 위치 로깅
-    console.log(`✅ 회원가입 성공: ${email} (${isMongoConnected ? 'MongoDB 저장' : '메모리 저장'})`);
-    
     res.json({
       user: { id: user._id || user.id, name: user.name, email: user.email },
       token,
       storage: isMongoConnected ? 'mongodb' : 'memory',
     });
   } catch (error) {
-    console.error('❌ 회원가입 오류:', error);
+    console.error('회원가입 오류:', error);
     res.status(400).json({ message: error.message });
   }
 });
@@ -716,39 +613,30 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    console.log('🔐 로그인 시도:', { email, hasPassword: !!password });
-    
     if (!email || !password) {
-      console.warn('❌ 이메일 또는 비밀번호가 없습니다');
       return res.status(400).json({ message: '이메일과 비밀번호를 입력해주세요.' });
     }
     
     const user = await dbOperations.findUser({ email });
     
     if (!user) {
-      console.warn('❌ 사용자를 찾을 수 없습니다:', email);
       return res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다.' });
     }
-    
-    console.log('👤 사용자 찾음:', { userId: user._id || user.id, email: user.email });
     
     const isPasswordValid = await bcrypt.compare(password, user.password);
     
     if (!isPasswordValid) {
-      console.warn('❌ 비밀번호가 일치하지 않습니다');
       return res.status(401).json({ message: '이메일 또는 비밀번호가 올바르지 않습니다.' });
     }
 
     const token = jwt.sign({ userId: user._id || user.id }, process.env.JWT_SECRET || 'secret');
-    
-    console.log('✅ 로그인 성공:', { userId: user._id || user.id, email: user.email });
     
     res.json({
       user: { id: user._id || user.id, name: user.name, email: user.email },
       token,
     });
   } catch (error) {
-    console.error('❌ 로그인 오류:', error);
+    console.error('로그인 오류:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -875,9 +763,7 @@ app.get('/api/interviews', authenticateToken, async (req, res) => {
 app.get('/api/interviews/:id', authenticateToken, async (req, res) => {
   try {
     const interviewId = req.params.id;
-    console.log(`🔍 면접 기록 조회 시도: ID=${interviewId}, userId=${req.user.userId}`);
     
-    // id와 _id 모두로 검색 시도
     const interview = await dbOperations.findInterview({
       _id: interviewId,
       id: interviewId,
@@ -885,19 +771,15 @@ app.get('/api/interviews/:id', authenticateToken, async (req, res) => {
     });
     
     if (!interview) {
-      console.log(`❌ 면접 기록을 찾을 수 없음: ID=${interviewId}`);
-      // 로컬 스토리지 ID(타임스탬프)인 경우 404 반환 (정상적인 상황)
       return res.status(404).json({ message: '면접 기록을 찾을 수 없습니다.' });
     }
     
-    console.log(`✅ 면접 기록 찾음: ID=${interview.id || interview._id}`);
-    // id 필드 확실히 추가
     if (interview._id && !interview.id) {
       interview.id = interview._id.toString();
     }
     res.json(interview);
   } catch (error) {
-    console.error('❌ 면접 기록 조회 오류:', error);
+    console.error('면접 기록 조회 오류:', error);
     // 에러 상세 정보 로깅
     console.error('에러 스택:', error.stack);
     // 데이터베이스 쿼리 오류는 500, 찾을 수 없는 경우는 404로 처리
@@ -1000,49 +882,77 @@ app.post('/api/feedback/batch', async (req, res) => {
       // 오디오 답변인 경우 텍스트로 변환
       if (answer && typeof answer === 'object' && answer.type === 'audio' && answer.base64Audio) {
         try {
-          console.log(`🎤 ${i + 1}번째 답변 오디오를 텍스트로 변환 중...`);
-          
           // base64를 Buffer로 변환
           const audioBuffer = Buffer.from(answer.base64Audio, 'base64');
           
-          // File 객체로 변환 (Whisper API 요구 형식)
-          const path = require('path');
-          const os = require('os');
+          // 오디오 파일 크기 확인 (너무 작으면 무음으로 간주)
+          const audioSizeKB = audioBuffer.length / 1024;
+          const duration = answer.duration || 0; // 초 단위
           
-          // 임시 파일 경로 생성
-          const tempDir = os.tmpdir();
-          const tempFilePath = path.join(tempDir, `audio_${Date.now()}_${i}.webm`);
-          
-          // Buffer를 임시 파일로 저장
-          fs.writeFileSync(tempFilePath, audioBuffer);
-          
-          // File 객체 생성 (File-like 객체)
-          const file = fs.createReadStream(tempFilePath);
-          
-          // OpenAI Whisper API로 오디오를 텍스트로 변환
-          const transcriptionResponse = await openai.audio.transcriptions.create({
-            file: file,
-            model: 'whisper-1',
-            language: 'ko', // 한국어로 지정
-            response_format: 'text',
-            temperature: 0,
-          });
-          
-          // 임시 파일 삭제
-          fs.unlinkSync(tempFilePath);
-          
-          // 한글 인코딩 처리
-          answer = transcriptionResponse || '';
-          if (typeof answer === 'string') {
-            // UTF-8 인코딩 보장
-            answer = Buffer.from(answer, 'utf8').toString('utf8');
-            // 불필요한 공백 제거
-            answer = answer.trim();
+          // 무음 또는 빈 오디오 체크
+          // 1. 파일 크기가 10KB 미만이거나
+          // 2. duration이 1초 미만이거나
+          // 3. duration이 0이면 무음으로 간주하고 STT 변환 건너뛰기
+          if (audioSizeKB < 10 || duration < 1 || duration === 0) {
+            answer = '';
+          } else {
+            
+            // File 객체로 변환 (Whisper API 요구 형식)
+            const path = require('path');
+            const os = require('os');
+            
+            // 임시 파일 경로 생성
+            const tempDir = os.tmpdir();
+            const tempFilePath = path.join(tempDir, `audio_${Date.now()}_${i}.webm`);
+            
+            // Buffer를 임시 파일로 저장
+            fs.writeFileSync(tempFilePath, audioBuffer);
+            
+            // File 객체 생성 (File-like 객체)
+            const file = fs.createReadStream(tempFilePath);
+            
+            // OpenAI Whisper API로 오디오를 텍스트로 변환
+            const transcriptionResponse = await openai.audio.transcriptions.create({
+              file: file,
+              model: 'whisper-1',
+              language: 'ko', // 한국어로 지정
+              response_format: 'text',
+              temperature: 0,
+            });
+            
+            // 임시 파일 삭제
+            fs.unlinkSync(tempFilePath);
+            
+            // 한글 인코딩 처리
+            answer = transcriptionResponse || '';
+            if (typeof answer === 'string') {
+              // UTF-8 인코딩 보장
+              answer = Buffer.from(answer, 'utf8').toString('utf8');
+              // 불필요한 공백 제거
+              answer = answer.trim();
+              
+              // 의미 없는 텍스트 필터링
+              // 1. 너무 짧은 텍스트 (10자 미만)
+              // 2. 일반적인 방송 인사말이나 의미 없는 패턴
+              const trimmedAnswer = answer.trim();
+              const meaninglessPatterns = [
+                /^시청해주셔서\s*감사합니다/i,
+                /^MBC\s*뉴스/i,
+                /^이덕영/i,
+              ];
+              
+              const isMeaningless = meaninglessPatterns.some(pattern => pattern.test(trimmedAnswer));
+              
+              if (trimmedAnswer.length < 10 || isMeaningless) {
+                answer = '';
+              } else {
+                answer = trimmedAnswer;
+              }
+            }
           }
-          console.log(`✅ ${i + 1}번째 답변 변환 완료: ${answer.substring(0, 50)}...`);
         } catch (error) {
-          console.error(`❌ ${i + 1}번째 오디오 변환 오류:`, error);
-          answer = ''; // 변환 실패 시 빈 문자열
+          console.error(`오디오 변환 오류:`, error);
+          answer = '';
         }
       }
       
@@ -1210,9 +1120,35 @@ ${companyName ? `- 회사: ${companyName}` : ''}
     let overallFeedback = null;
     try {
       const allQuestions = questions.map(q => q.text || q).join('\n- ');
-      const allAnswers = answers.filter(a => a && a.trim()).join('\n\n---\n\n');
+      // answers가 문자열 배열이 되었으므로 안전하게 필터링
+      const allAnswers = answers
+        .filter(a => {
+          // 문자열인지 확인 후 trim 체크
+          if (!a || typeof a !== 'string') return false;
+          const trimmed = a.trim();
+          return trimmed.length > 0;
+        })
+        .map(a => {
+          // 안전하게 trim
+          return typeof a === 'string' ? a.trim() : '';
+        })
+        .filter(a => a.length > 0); // 빈 문자열 제거
       
-      const overallPrompt = `당신은 ${companyName ? companyName + '에서 ' : ''}${job} 포지션을 채용하는 경력 15년 이상의 시니어 면접관입니다. 실제 채용 결정을 내리는 것과 동일한 엄격한 기준으로 전체 면접을 종합적으로 평가해주세요.
+      // 실제 답변이 하나도 없으면 종합평가를 생성하지 않음
+      if (allAnswers.length === 0) {
+        overallFeedback = {
+          overallComment: '모든 질문에 대한 답변이 제공되지 않았습니다. 면접을 완료하려면 모든 질문에 답변해주세요.',
+          keyStrengths: [],
+          keyWeaknesses: ['모든 질문에 답변하지 않았습니다.'],
+          improvementAreas: ['면접 질문에 대한 답변 준비'],
+          improvementSuggestions: ['면접 전 질문을 미리 검토하고 답변을 준비하세요.', '답변할 수 없는 질문이 있으면 솔직하게 말하는 것도 중요합니다.'],
+          interviewerPerspective: '이 지원자는 면접 질문에 답변하지 않아 평가할 수 없습니다. 면접을 완료하려면 모든 질문에 답변해야 합니다.'
+        };
+      } else {
+        const allAnswersText = allAnswers.join('\n\n---\n\n');
+        
+        try {
+          const overallPrompt = `당신은 ${companyName ? companyName + '에서 ' : ''}${job} 포지션을 채용하는 경력 15년 이상의 시니어 면접관입니다. 실제 채용 결정을 내리는 것과 동일한 엄격한 기준으로 전체 면접을 종합적으로 평가해주세요.
 
 ⚠️ 중요한 원칙:
 - 칭찬만 하지 마세요. 부족한 점을 명확히 지적해야 지원자가 발전할 수 있습니다.
@@ -1229,7 +1165,7 @@ ${companyName ? `- 회사: ${companyName}` : ''}
 - ${allQuestions}
 
 【전체 답변 내용】
-${allAnswers}
+${allAnswersText}
 
 【종합평가 요구사항 (엄격하고 솔직하게)】
 1. 전체 면접에서 지원자가 보여준 강점과 약점을 종합적으로 분석하세요. 약점이 많으면 솔직하게 많이 지적하세요.
@@ -1254,14 +1190,19 @@ ${allAnswers}
   "interviewerPerspective": "면접관 관점에서 이 지원자를 어떻게 평가할지 구체적으로 서술 (최소 200자 이상)"
 }`;
 
-      const overallCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: overallPrompt }],
-        response_format: { type: 'json_object' },
-        temperature: 1.0,
-      });
+          const overallCompletion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: overallPrompt }],
+            response_format: { type: 'json_object' },
+            temperature: 1.0,
+          });
 
-      overallFeedback = JSON.parse(overallCompletion.choices[0].message.content);
+          overallFeedback = JSON.parse(overallCompletion.choices[0].message.content);
+        } catch (error) {
+          console.error('종합평가 생성 오류:', error);
+          // 종합평가 실패해도 개별 피드백은 반환
+        }
+      }
     } catch (error) {
       console.error('종합평가 생성 오류:', error);
       // 종합평가 실패해도 개별 피드백은 반환
@@ -1309,9 +1250,7 @@ app.post('/api/questions/generate', async (req, res) => {
 
 questions 배열에 질문 ${questionCount}개를 정확히 포함해주세요.`;
 
-    // OpenAI API 키 확인
     const apiKey = process.env.OPENAI_API_KEY?.trim();
-    console.log('🔍 OpenAI API 키 확인:', apiKey ? `${apiKey.substring(0, 20)}...` : '없음');
     
     if (!apiKey) {
       return res.status(500).json({ 
@@ -1510,15 +1449,11 @@ app.post('/api/questions/community/:id/comments', authenticateToken, async (req,
     const postId = req.params.id;
     const { text } = req.body;
     
-    console.log('💬 댓글 작성 시도:', { postId, userId: req.user.userId, hasText: !!text });
-    
     if (!text || !text.trim()) {
       return res.status(400).json({ message: '댓글 내용을 입력해주세요.' });
     }
 
     const user = await dbOperations.findUser({ id: req.user.userId });
-    console.log('👤 사용자 찾음:', { userId: user?._id || user?.id, userName: user?.name });
-    
     const comment = await dbOperations.saveComment({
       postId,
       text: text.trim(),
@@ -1526,10 +1461,9 @@ app.post('/api/questions/community/:id/comments', authenticateToken, async (req,
       userName: user?.name || '익명',
     });
     
-    console.log('✅ 댓글 저장 완료:', { commentId: comment._id || comment.id, postId });
     res.json(comment);
   } catch (error) {
-    console.error('❌ 댓글 작성 오류:', error);
+    console.error('댓글 작성 오류:', error);
     res.status(400).json({ message: error.message });
   }
 });
@@ -1625,137 +1559,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 디버깅용: 사용자 목록 조회 (개발 환경에서만 사용)
-app.get('/api/debug/users', async (req, res) => {
-  try {
-    const readyState = mongoose.connection.readyState;
-    const isActuallyConnected = readyState === 1;
-    
-    if (isActuallyConnected) {
-      const users = await User.find({}).select('name email createdAt').sort({ createdAt: -1 });
-      res.json({
-        storage: 'mongodb',
-        mongodbReadyState: readyState,
-        databaseName: mongoose.connection.db.databaseName,
-        count: users.length,
-        users: users,
-      });
-    } else {
-      res.json({
-        storage: 'memory',
-        mongodbReadyState: readyState,
-        warning: 'MongoDB에 연결되지 않아 메모리에 저장된 데이터만 표시됩니다.',
-        count: memoryStore.users.length,
-        users: memoryStore.users.map(u => ({
-          name: u.name,
-          email: u.email,
-          createdAt: u.createdAt,
-        })),
-      });
-    }
-  } catch (error) {
-    res.status(500).json({ message: error.message, error: error.toString() });
-  }
-});
-
-// 디버깅용: 모든 데이터 삭제 (개발 환경에서만 사용)
-app.delete('/api/debug/clear-all', async (req, res) => {
-  try {
-    const readyState = mongoose.connection.readyState;
-    const isActuallyConnected = readyState === 1;
-    
-    if (isActuallyConnected) {
-      // MongoDB에서 모든 컬렉션 데이터 삭제
-      const deletedUsers = await User.deleteMany({});
-      const deletedInterviews = await Interview.deleteMany({});
-      const deletedQuestions = await Question.deleteMany({});
-      const deletedComments = await Comment.deleteMany({});
-      
-      res.json({
-        success: true,
-        message: '모든 데이터가 삭제되었습니다.',
-        deleted: {
-          users: deletedUsers.deletedCount,
-          interviews: deletedInterviews.deletedCount,
-          questions: deletedQuestions.deletedCount,
-          comments: deletedComments.deletedCount,
-        },
-      });
-    } else {
-      // 메모리 저장소 초기화
-      memoryStore.users = [];
-      memoryStore.interviews = [];
-      memoryStore.questions = [];
-      memoryStore.comments = [];
-      
-      res.json({
-        success: true,
-        message: '메모리 저장소의 모든 데이터가 삭제되었습니다.',
-        storage: 'memory',
-      });
-    }
-  } catch (error) {
-    console.error('❌ 데이터 삭제 오류:', error);
-    res.status(500).json({ message: error.message, error: error.toString() });
-  }
-});
-
-// 디버깅용: 특정 컬렉션만 삭제
-app.delete('/api/debug/clear/:collection', async (req, res) => {
-  try {
-    const { collection } = req.params;
-    const readyState = mongoose.connection.readyState;
-    const isActuallyConnected = readyState === 1;
-    
-    if (isActuallyConnected) {
-      let deletedCount = 0;
-      
-      switch (collection) {
-        case 'users':
-          const result1 = await User.deleteMany({});
-          deletedCount = result1.deletedCount;
-          break;
-        case 'interviews':
-          const result2 = await Interview.deleteMany({});
-          deletedCount = result2.deletedCount;
-          break;
-        case 'questions':
-          const result3 = await Question.deleteMany({});
-          deletedCount = result3.deletedCount;
-          break;
-        case 'comments':
-          const result4 = await Comment.deleteMany({});
-          deletedCount = result4.deletedCount;
-          break;
-        default:
-          return res.status(400).json({ message: '유효하지 않은 컬렉션입니다. (users, interviews, questions, comments)' });
-      }
-      
-      res.json({
-        success: true,
-        message: `${collection} 컬렉션의 모든 데이터가 삭제되었습니다.`,
-        deletedCount,
-      });
-    } else {
-      // 메모리 저장소에서 삭제
-      if (memoryStore[collection]) {
-        const count = memoryStore[collection].length;
-        memoryStore[collection] = [];
-        res.json({
-          success: true,
-          message: `메모리 저장소의 ${collection} 데이터가 삭제되었습니다.`,
-          deletedCount: count,
-          storage: 'memory',
-        });
-      } else {
-        res.status(400).json({ message: '유효하지 않은 컬렉션입니다.' });
-      }
-    }
-  } catch (error) {
-    console.error('❌ 데이터 삭제 오류:', error);
-    res.status(500).json({ message: error.message, error: error.toString() });
-  }
-});
 
 // 서버 시작
 const HOST = process.env.HOST || '0.0.0.0'; // 외부 접속 허용
@@ -1864,6 +1667,5 @@ server.listen(PORT, HOST, () => {
   console.log(`   - 로컬: ${protocol}://localhost:${PORT}`);
   console.log(`   - 네트워크: ${protocol}://${localIP}:${PORT}`);
   console.log(`🔍 헬스 체크: ${protocol}://${localIP}:${PORT}/health`);
-  console.log(`👥 사용자 확인: ${protocol}://${localIP}:${PORT}/api/debug/users`);
 });
 

@@ -66,6 +66,16 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true };
     } catch (error) {
+      // 인증서 오류 처리
+      if (error.code === 'ERR_CERT_AUTHORITY_INVALID' || error.message?.includes('certificate') || error.message?.includes('CERT')) {
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+        const backendUrl = apiUrl.replace('/api', '');
+        return {
+          success: false,
+          error: `인증서 오류가 발생했습니다. 먼저 브라우저에서 ${backendUrl} 에 접속하여 인증서를 수락해주세요. (고급 → 안전하지 않음으로 이동)`,
+        };
+      }
+      
       // 백엔드 연결 실패 시 로컬 스토리지 사용 (오프라인 모드)
       if (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED') {
         // 로컬 스토리지에서 사용자 확인

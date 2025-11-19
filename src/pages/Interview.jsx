@@ -16,7 +16,7 @@ const Interview = () => {
   const [difficulty, setDifficulty] = useState(preloadedData.difficulty || 'medium');
   const [mode, setMode] = useState(preloadedData.mode || 'practice');
   const [companyName, setCompanyName] = useState(preloadedData.companyName || '');
-  const [questionCount, setQuestionCount] = useState(preloadedData.questions?.length || 5);
+  const [questionCount, setQuestionCount] = useState(preloadedData.questions?.length || 3);
   const [questions, setQuestions] = useState(preloadedData.questions || []);
   const [answers, setAnswers] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -25,11 +25,6 @@ const Interview = () => {
   const timerRef = useRef(null);
   
   // 로그인 체크는 렌더링 단계에서 처리
-  
-  // 디버깅용: 모드와 시작 상태 확인
-  useEffect(() => {
-    console.log('📊 면접 상태:', { mode, isStarted, timeLeft, currentQuestionIndex });
-  }, [mode, isStarted, timeLeft, currentQuestionIndex]);
 
   useEffect(() => {
     if (preloadedData.questions?.length) {
@@ -37,17 +32,26 @@ const Interview = () => {
     }
   }, [preloadedData.questions]);
 
-  // 실전 모드 시간 제한 설정 및 타이머 시작
+  // 실전 모드 시간 제한 설정 및 타이머 시작 (난이도별 차등 적용)
   useEffect(() => {
     if (isStarted && mode === 'real' && timeLeft === null) {
-      // 실전 모드: 질문당 3분 (180초)
-      console.log('⏱️ 실전 모드 타이머 시작:', mode, isStarted);
-      setTimeLeft(180);
+      // 실전 모드: 난이도별 시간 제한
+      // 초급: 4분 (240초), 중급: 3분 (180초), 고급: 2분 (120초)
+      let timeLimit = 180; // 기본값 (중급)
+      if (difficulty === 'easy') {
+        timeLimit = 240; // 초급: 4분
+      } else if (difficulty === 'medium') {
+        timeLimit = 180; // 중급: 3분
+      } else if (difficulty === 'hard') {
+        timeLimit = 120; // 고급: 2분
+      }
+      console.log('⏱️ 실전 모드 타이머 시작:', mode, isStarted, `난이도: ${difficulty}, 시간: ${timeLimit}초`);
+      setTimeLeft(timeLimit);
     } else if (mode !== 'real') {
       // 연습 모드일 때는 타이머 초기화
       setTimeLeft(null);
     }
-  }, [isStarted, mode]);
+  }, [isStarted, mode, difficulty]);
 
   const handleAutoNext = useCallback(() => {
     // 현재 답변 자동 저장
@@ -64,7 +68,7 @@ const Interview = () => {
     } else {
       // 마지막 질문이면 면접 완료
       navigate('/feedback', {
-        state: { questions, answers, job, difficulty, mode, companyName },
+        state: { questions, answers, job, difficulty, mode, companyName, interviewType: 'text' },
       });
     }
   }, [currentQuestionIndex, answers, questions, navigate, job, difficulty, mode, companyName]);
@@ -105,18 +109,32 @@ const Interview = () => {
     };
   }, [mode, isStarted, timeLeft, handleAutoNext]);
 
-  // 질문이 변경될 때마다 타이머 리셋
+  // 질문이 변경될 때마다 타이머 리셋 (난이도별 차등 적용)
   useEffect(() => {
     if (mode === 'real' && isStarted) {
-      // 새 질문으로 이동할 때 타이머 리셋
-      setTimeLeft(180); // 새 질문마다 3분 리셋
+      // 새 질문으로 이동할 때 타이머 리셋 (난이도별 시간 제한)
+      let timeLimit = 180; // 기본값 (중급)
+      if (difficulty === 'easy') {
+        timeLimit = 240; // 초급: 4분
+      } else if (difficulty === 'medium') {
+        timeLimit = 180; // 중급: 3분
+      } else if (difficulty === 'hard') {
+        timeLimit = 120; // 고급: 2분
+      }
+      setTimeLeft(timeLimit);
     }
-  }, [currentQuestionIndex, mode, isStarted]);
+  }, [currentQuestionIndex, mode, isStarted, difficulty]);
 
 
   const startInterview = () => {
-    // 직무별 실제 면접 질문 가져오기
-    const jobQuestions = getQuestionsByJob(job, 10); // 항상 10개 모두 가져오기
+    // 직무별 실제 면접 질문 가져오기 (난이도 필터링 적용)
+    const jobQuestions = getQuestionsByJob(job, 10, difficulty); // 난이도에 맞는 질문만 가져오기
+    
+    // 난이도 필터링 후 질문이 부족한 경우 처리
+    if (jobQuestions.length === 0) {
+      alert('선택한 난이도에 해당하는 질문이 없습니다. 다른 난이도를 선택해주세요.');
+      return;
+    }
     
     // 요청한 질문 개수만큼 샘플링 (더 나은 랜덤 선택)
     let finalQuestions;
@@ -141,8 +159,8 @@ const Interview = () => {
   };
 
   const handleAnswerChange = (index, value) => {
-    // 500자 제한
-    if (value.length <= 500) {
+    // 800자 제한
+    if (value.length <= 800) {
       const newAnswers = [...answers];
       newAnswers[index] = value;
       setAnswers(newAnswers);
@@ -155,7 +173,7 @@ const Interview = () => {
     } else {
       // 면접 완료
       navigate('/feedback', {
-        state: { questions, answers, job, difficulty, mode, companyName },
+        state: { questions, answers, job, difficulty, mode, companyName, interviewType: 'text' },
       });
     }
   };
@@ -163,7 +181,7 @@ const Interview = () => {
   if (!isStarted) {
     return (
       <div className="interview-page">
-        <h1>면접 설정</h1>
+        <h1>텍스트 면접 설정</h1>
         <div className="form-section">
           <div className="form-group">
             <label>직무 선택 *</label>
@@ -322,10 +340,29 @@ const Interview = () => {
             <input
               type="number"
               min="1"
-              max="20"
+              max="3"
               value={questionCount}
-              onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (isNaN(value)) {
+                  return;
+                }
+                if (value < 1) {
+                  alert('질문 개수는 최소 1개 이상이어야 합니다.');
+                  setQuestionCount(1);
+                  return;
+                }
+                if (value > 3) {
+                  alert('질문 개수는 최대 3개까지만 선택할 수 있습니다.');
+                  setQuestionCount(3);
+                  return;
+                }
+                setQuestionCount(value);
+              }}
             />
+            <small style={{ display: 'block', marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              질문 개수는 1개부터 3개까지 선택 가능합니다.
+            </small>
           </div>
           <button onClick={startInterview} className="btn btn-primary" disabled={!job}>
             면접 시작
@@ -443,6 +480,9 @@ const Interview = () => {
                   {timeLeft <= 30 && (
                     <span style={{ fontSize: '0.9rem' }}>남은 시간</span>
                   )}
+                  <span style={{ fontSize: '0.85rem', marginLeft: '0.5rem', opacity: 0.8 }}>
+                    ({difficulty === 'easy' ? '초급' : difficulty === 'medium' ? '중급' : '고급'})
+                  </span>
                 </div>
               )}
             </div>
@@ -453,24 +493,28 @@ const Interview = () => {
               style={{ width: `${progress}%` }}
             ></div>
           </div>
-          {mode === 'real' && timeLeft !== null && (
-            <div style={{
-              width: '100%',
-              height: '4px',
-              backgroundColor: 'rgba(0, 0, 0, 0.1)',
-              borderRadius: '2px',
-              marginTop: '0.5rem',
-              overflow: 'hidden'
-            }}>
+          {mode === 'real' && timeLeft !== null && (() => {
+            // 난이도별 최대 시간 계산
+            const maxTime = difficulty === 'easy' ? 240 : difficulty === 'medium' ? 180 : 120;
+            return (
               <div style={{
-                width: `${(timeLeft / 180) * 100}%`,
-                height: '100%',
-                backgroundColor: timeLeft <= 30 ? '#ef4444' : '#6366f1',
-                transition: 'width 1s linear, background-color 0.3s ease',
-                borderRadius: '2px'
-              }}></div>
-            </div>
-          )}
+                width: '100%',
+                height: '4px',
+                backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                borderRadius: '2px',
+                marginTop: '0.5rem',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${(timeLeft / maxTime) * 100}%`,
+                  height: '100%',
+                  backgroundColor: timeLeft <= 30 ? '#ef4444' : '#6366f1',
+                  transition: 'width 1s linear, background-color 0.3s ease',
+                  borderRadius: '2px'
+                }}></div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* 질문 카드 */}
@@ -494,15 +538,15 @@ const Interview = () => {
               답변 작성
             </label>
             <div className="answer-stats">
-              <span className={`char-count ${answerLength >= 500 ? 'char-limit' : answerLength >= 450 ? 'char-warning' : ''}`}>
-                {answerLength.toLocaleString()} / 500자
+              <span className={`char-count ${answerLength >= 800 ? 'char-limit' : answerLength >= 750 ? 'char-warning' : ''}`}>
+                {answerLength.toLocaleString()} / 800자
               </span>
-              {answerLength >= 500 && (
+              {answerLength >= 800 && (
                 <span className="char-limit-message" style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 600 }}>
                   최대 글자 수에 도달했습니다
                 </span>
               )}
-              {answerLength > 0 && answerLength < 500 && (
+              {answerLength > 0 && answerLength < 800 && (
                 <span className="word-count">
                   약 {Math.ceil(answerLength / 3)}단어
                 </span>
@@ -514,9 +558,9 @@ const Interview = () => {
             className="answer-textarea"
             value={currentAnswer}
             onChange={(e) => handleAnswerChange(currentQuestionIndex, e.target.value)}
-            placeholder="여기에 답변을 작성하세요. 최소 50자 이상 작성하시면 더 나은 피드백을 받을 수 있습니다. (최대 500자)"
+            placeholder="여기에 답변을 작성하세요. 최소 50자 이상 작성하시면 더 나은 피드백을 받을 수 있습니다. (최대 800자)"
             rows={12}
-            maxLength={500}
+            maxLength={800}
             autoFocus
           />
           <div className="answer-footer">
@@ -529,9 +573,9 @@ const Interview = () => {
                   ⚠️ 최소 50자 이상 작성하는 것을 권장합니다.
                 </small>
               )}
-              {answerLength >= 450 && answerLength < 500 && (
+              {answerLength >= 750 && answerLength < 800 && (
                 <small style={{ color: '#f59e0b', fontSize: '0.85rem' }}>
-                  ⚠️ 500자 제한에 근접했습니다. ({500 - answerLength}자 남음)
+                  ⚠️ 800자 제한에 근접했습니다. ({800 - answerLength}자 남음)
                 </small>
               )}
             </div>

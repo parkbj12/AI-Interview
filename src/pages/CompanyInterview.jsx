@@ -385,6 +385,27 @@ const CompanyInterview = () => {
                 <button onClick={handleStartInterview} className="btn btn-primary">
                   이 질문으로 면접 시작하기
                 </button>
+                <button 
+                  onClick={handleGenerate} 
+                  className="btn btn-secondary"
+                  disabled={loading || !companyName.trim() || !job.trim()}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem' 
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <span>⏳</span>
+                      <span>생성 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>다시 생성하기</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
             <div className="questions-list">

@@ -15,7 +15,7 @@ const VideoInterview = () => {
   const [difficulty, setDifficulty] = useState(preloadedData.difficulty || 'medium');
   const [mode, setMode] = useState(preloadedData.mode || 'practice');
   const [companyName, setCompanyName] = useState(preloadedData.companyName || '');
-  const [questionCount, setQuestionCount] = useState(preloadedData.questions?.length || 5);
+  const [questionCount, setQuestionCount] = useState(preloadedData.questions?.length || 3);
   const [questions, setQuestions] = useState(preloadedData.questions || []);
   const [answers, setAnswers] = useState([]); // 녹음된 오디오 데이터 저장
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -28,6 +28,7 @@ const VideoInterview = () => {
   const [audioChunks, setAudioChunks] = useState([]);
   const [streamReady, setStreamReady] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0); // 오디오 레벨 (0-100)
+  const [audioData, setAudioData] = useState(new Uint8Array(0)); // 실시간 오디오 데이터
   const [answerCompleted, setAnswerCompleted] = useState([]); // 각 질문별 답변 완료 여부 추적
   const [answerAttempts, setAnswerAttempts] = useState([]); // 각 질문별 완료된 답변 시도 횟수 (0, 1, 2)
   const [currentAttempt, setCurrentAttempt] = useState(1); // 현재 시도 중인 횟수 (1 또는 2, 최대 2)
@@ -132,14 +133,8 @@ const VideoInterview = () => {
     }
   }, [isRecording, mediaRecorder, answers, answerCompleted, currentQuestionIndex, questions, navigate, job, difficulty, mode, companyName]);
 
-  // 답변 시간 제한 설정 및 타이머 시작 (90초)
-  useEffect(() => {
-    if (isStarted && timeLeft === null) {
-      // 모든 모드에서 질문당 90초 제한
-      console.log('⏱️ 답변 타이머 시작: 90초');
-      setTimeLeft(90);
-    }
-  }, [isStarted]);
+  // 답변 시간 제한 설정 - "답변 시작" 버튼을 눌렀을 때만 타이머 시작
+  // (자동으로 시작하지 않음)
 
   // 타이머 동작
   useEffect(() => {
@@ -189,18 +184,33 @@ const VideoInterview = () => {
       
       // 1차 답변이 완료되었고 아직 2차 답변을 하지 않은 경우, 자동으로 타이머 리셋
       if (isCurrentAnswerCompleted && currentAttemptCount === 1 && currentAttemptCount < 2) {
-        console.log('⏱️ 1차 답변 완료 후 시간 종료 - 2차 답변 기회로 자동 전환');
-        setTimeLeft(90); // 타이머 리셋
+        // 난이도별 시간 제한: 초급 120초, 중급 90초, 고급 60초
+        let timeLimit = 90; // 기본값 (중급)
+        if (difficulty === 'easy') {
+          timeLimit = 120; // 초급: 2분
+        } else if (difficulty === 'medium') {
+          timeLimit = 90; // 중급: 1분 30초
+        } else if (difficulty === 'hard') {
+          timeLimit = 60; // 고급: 1분
+        }
+        console.log(`⏱️ 1차 답변 완료 후 시간 종료 - 2차 답변 기회로 자동 전환 (${timeLimit}초)`);
+        setTimeLeft(timeLimit); // 타이머 리셋
         setCurrentAttempt(2); // 2차 답변으로 설정
         currentAttemptRef.current = 2;
       }
     }
-  }, [timeLeft, isStarted, isRecording, answerAttempts, answerCompleted, currentQuestionIndex, currentAttempt]);
+  }, [timeLeft, isStarted, isRecording, answerAttempts, answerCompleted, currentQuestionIndex, currentAttempt, difficulty]);
 
-  // 질문이 변경될 때마다 타이머 리셋 및 시도 횟수 초기화
+  // 질문이 변경될 때마다 타이머 중지 및 시도 횟수 초기화
   useEffect(() => {
     if (isStarted) {
-      setTimeLeft(90); // 새 질문마다 90초 리셋
+      // 타이머 중지 (답변 시작 버튼을 눌러야 시작)
+      setTimeLeft(null);
+      // 기존 타이머 정리
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       setCurrentAttempt(1); // 시도 횟수 초기화
       currentAttemptRef.current = 1; // ref도 초기화
     }
@@ -367,7 +377,13 @@ const VideoInterview = () => {
   const startInterview = () => {
     // 이미 질문이 있으면 사용, 없으면 직무별 실제 면접 질문 가져오기
     if (questions.length === 0) {
-      const jobQuestions = getQuestionsByJob(job, 10); // 항상 10개 모두 가져오기
+      const jobQuestions = getQuestionsByJob(job, 10, difficulty); // 난이도에 맞는 질문만 가져오기
+      
+      // 난이도 필터링 후 질문이 부족한 경우 처리
+      if (jobQuestions.length === 0) {
+        alert('선택한 난이도에 해당하는 질문이 없습니다. 다른 난이도를 선택해주세요.');
+        return;
+      }
       
       // 요청한 질문 개수만큼 샘플링 (더 나은 랜덤 선택)
       if (jobQuestions.length > questionCount) {
@@ -457,8 +473,8 @@ const VideoInterview = () => {
           latencyHint: 'interactive' // 낮은 지연 시간
         });
         const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 512; // 더 높은 해상도 (256 -> 512)
-        analyser.smoothingTimeConstant = 0.8;
+        analyser.fftSize = 512; // 웨이브 효과를 위한 더 높은 해상도 (더 많은 주파수 대역)
+        analyser.smoothingTimeConstant = 0.1; // 매우 빠른 반응을 위해 매우 낮게 설정
         
         const microphone = audioContext.createMediaStreamSource(audioStream);
         microphone.connect(analyser);
@@ -662,6 +678,21 @@ const VideoInterview = () => {
         setMediaRecorder(recorder);
         setIsRecording(true);
         
+        // 답변 타이머 시작 (난이도별 차등 적용) - "답변 시작" 버튼을 눌렀을 때만 시작
+        if (timeLeft === null) {
+          // 난이도별 시간 제한: 초급 120초, 중급 90초, 고급 60초
+          let timeLimit = 90; // 기본값 (중급)
+          if (difficulty === 'easy') {
+            timeLimit = 120; // 초급: 2분
+          } else if (difficulty === 'medium') {
+            timeLimit = 90; // 중급: 1분 30초
+          } else if (difficulty === 'hard') {
+            timeLimit = 60; // 고급: 1분
+          }
+          console.log(`⏱️ 답변 타이머 시작: ${timeLimit}초 (난이도: ${difficulty})`);
+          setTimeLeft(timeLimit);
+        }
+        
         // 녹음 시간 초기화
         setRecordingTime(0);
         finalRecordingTimeRef.current = 0;
@@ -698,27 +729,58 @@ const VideoInterview = () => {
   const startAudioLevelMonitoring = () => {
     if (!analyserRef.current) return;
     
+    // 기존 애니메이션 프레임 취소
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    let smoothedLevel = 0; // 부드러운 레벨 추적을 위한 변수
     
     const updateAudioLevel = () => {
-      if (!analyserRef.current || !isRecording) {
+      // analyserRef를 직접 체크 (클로저 문제 방지)
+      if (!analyserRef.current) {
         setAudioLevel(0);
+        setAudioData(new Uint8Array(0));
         return;
       }
       
+      // 실시간으로 오디오 데이터 가져오기
       analyserRef.current.getByteFrequencyData(dataArray);
       
-      // 평균 레벨 계산
-      let sum = 0;
+      // 실시간 오디오 데이터 저장 (웨이브 효과용) - 새로운 배열로 복사
+      const newAudioData = new Uint8Array(dataArray);
+      setAudioData(newAudioData);
+      
+      // 디버깅: 오디오 데이터가 업데이트되는지 확인 (주석 처리 가능)
+      // if (newAudioData.length > 0 && Math.random() < 0.01) { // 1% 확률로만 로그
+      //   console.log('🎵 오디오 데이터 업데이트:', {
+      //     length: newAudioData.length,
+      //     maxValue: Math.max(...Array.from(newAudioData)),
+      //     avgValue: Array.from(newAudioData).reduce((a, b) => a + b, 0) / newAudioData.length
+      //   });
+      // }
+      
+      // RMS (Root Mean Square) 방식으로 더 정확한 레벨 계산
+      let sumSquares = 0;
+      let maxValue = 0;
       for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i];
+        const value = dataArray[i];
+        sumSquares += value * value;
+        if (value > maxValue) maxValue = value;
       }
-      const average = sum / dataArray.length;
+      const rms = Math.sqrt(sumSquares / dataArray.length);
       
-      // 0-100 범위로 정규화
-      const normalizedLevel = Math.min(100, (average / 255) * 100);
-      setAudioLevel(normalizedLevel);
+      // 0-100 범위로 정규화 (더 민감하게, 최대값도 고려)
+      const normalizedLevel = Math.min(100, (rms / 255) * 100 * 2.0 + (maxValue / 255) * 20);
       
+      // 부드러운 전환을 위한 지수 이동 평균 (EMA) - 더 빠른 반응
+      smoothedLevel = smoothedLevel * 0.6 + normalizedLevel * 0.4;
+      
+      setAudioLevel(Math.round(smoothedLevel));
+      
+      // 계속 업데이트
       animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
     };
     
@@ -1006,10 +1068,29 @@ const VideoInterview = () => {
             <input
               type="number"
               min="1"
-              max="20"
+              max="3"
               value={questionCount}
-              onChange={(e) => setQuestionCount(parseInt(e.target.value))}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (isNaN(value)) {
+                  return;
+                }
+                if (value < 1) {
+                  alert('질문 개수는 최소 1개 이상이어야 합니다.');
+                  setQuestionCount(1);
+                  return;
+                }
+                if (value > 3) {
+                  alert('질문 개수는 최대 3개까지만 선택할 수 있습니다.');
+                  setQuestionCount(3);
+                  return;
+                }
+                setQuestionCount(value);
+              }}
             />
+            <small style={{ display: 'block', marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              질문 개수는 1개부터 3개까지 선택 가능합니다.
+            </small>
           </div>
           <button onClick={startInterview} className="btn btn-primary" disabled={!job}>
             면접 시작
@@ -1119,89 +1200,99 @@ const VideoInterview = () => {
             </div>
           )}
           
-          {/* 오디오 레벨 시각화 */}
+          {/* 웨이브 그래프만 표시 - 작고 덜 눈에 띄게 */}
           {isRecording && (
             <div style={{
               position: 'absolute',
-              bottom: '2rem',
+              bottom: '1rem',
               left: '50%',
               transform: 'translateX(-50%)',
-              width: '90%',
-              maxWidth: '600px',
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              padding: '1rem',
-              borderRadius: 'var(--radius-md)',
-              zIndex: 10
+              width: '70%',
+              maxWidth: '300px',
+              backgroundColor: 'rgba(0, 0, 0, 0.3)',
+              padding: '0.4rem 0.6rem',
+              borderRadius: 'var(--radius-sm)',
+              zIndex: 10,
+              backdropFilter: 'blur(2px)'
             }}>
+              {/* 웨이브 효과 - 실시간 오디오 데이터 사용 */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.5rem',
-                marginBottom: '0.5rem'
-              }}>
-                <span style={{ color: 'white', fontSize: '0.9rem' }}>🎤</span>
-                <span style={{ color: 'white', fontSize: '0.9rem', fontWeight: 'bold' }}>
-                  {audioLevel > 5 ? '말하고 있습니다...' : '대기 중...'}
-                </span>
-              </div>
-              
-              {/* 오디오 레벨 바 */}
-              <div style={{
-                width: '100%',
-                height: '8px',
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                position: 'relative'
-              }}>
-                <div style={{
-                  width: `${audioLevel}%`,
-                  height: '100%',
-                  background: audioLevel > 30 
-                    ? `linear-gradient(90deg, hsl(120, 70%, 75%) ${audioLevel - 30}%, hsl(130, 65%, 80%) 30%, hsl(140, 60%, 85%) ${100 - audioLevel}%)`
-                    : audioLevel > 10
-                    ? `linear-gradient(90deg, hsl(120, 65%, 80%) ${audioLevel}%, rgba(200, 255, 200, 0.3) ${100 - audioLevel}%)`
-                    : 'rgba(200, 255, 200, 0.3)',
-                  transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  borderRadius: '4px',
-                  boxShadow: audioLevel > 10 ? '0 0 10px rgba(200, 255, 200, 0.5)' : 'none'
-                }}></div>
-              </div>
-              
-              {/* 웨이브 효과 */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '3px',
-                marginTop: '0.75rem',
-                height: '30px'
-              }}>
-                {Array.from({ length: 20 }).map((_, i) => {
-                  // 각 바의 높이를 audioLevel과 사인파로 계산 (안정적인 애니메이션)
-                  const phase = (i / 20) * Math.PI * 2;
-                  const variation = Math.sin(phase + (recordingTime * 0.1));
-                  const baseHeight = audioLevel > 5 ? (audioLevel / 100) * 25 : 4;
-                  const barHeight = Math.max(4, baseHeight + (variation * 5));
+                gap: '1px',
+                height: '35px',
+                padding: '0 0.15rem'
+              }} key={`wave-container-${audioLevel}-${audioData.length}`}>
+                {Array.from({ length: 30 }).map((_, i) => {
+                  // 실시간 오디오 데이터를 사용하여 각 주파수 대역별 높이 계산
+                  let barHeight = 2;
+                  let intensity = 0;
                   
-                  // 연한 연두색 계열 (hue: 120-150, saturation: 60-70%, lightness: 75-85%)
-                  const lightness = 75 + (audioLevel / 100) * 10; // 75-85%
-                  const saturation = 60 + (audioLevel / 100) * 10; // 60-70%
-                  const greenHue = 120 + (audioLevel / 100) * 20; // 120-140
+                  if (audioData.length > 0) {
+                    // 각 바에 해당하는 주파수 대역 인덱스 계산
+                    const dataIndex = Math.floor((i / 30) * audioData.length);
+                    const value = audioData[dataIndex] || 0;
+                    
+                    // 인접한 데이터 포인트들의 평균으로 부드럽게 (더 넓은 범위)
+                    const range = Math.max(1, Math.floor(audioData.length / 30));
+                    let sum = 0;
+                    let count = 0;
+                    for (let j = Math.max(0, dataIndex - range); j <= Math.min(audioData.length - 1, dataIndex + range); j++) {
+                      sum += audioData[j] || 0;
+                      count++;
+                    }
+                    const avgValue = count > 0 ? sum / count : value;
+                    
+                    // intensity 계산 (더 민감하게)
+                    intensity = avgValue / 255;
+                    
+                    // 오디오 레벨이 낮으면 intensity도 낮춤 (하지만 완전히 멈추지는 않음)
+                    if (audioLevel <= 5) {
+                      intensity = intensity * 0.1; // 매우 낮은 레벨일 때는 거의 움직이지 않음
+                    } else if (audioLevel <= 10) {
+                      intensity = intensity * 0.4; // 낮은 레벨일 때는 약간 움직임
+                    } else {
+                      // 정상 레벨일 때는 그대로 사용
+                      intensity = Math.min(1, intensity * 1.2); // 약간 증폭
+                    }
+                    
+                    // 높이 계산 (최소 2px, 최대 32px) - 더 작고 덜 눈에 띄게
+                    barHeight = Math.max(2, Math.min(32, 2 + (intensity * 30)));
+                  } else {
+                    // audioData가 없을 때는 audioLevel을 사용하여 웨이브 표시
+                    if (audioLevel > 5) {
+                      // 각 바마다 약간 다른 높이를 주어 웨이브 효과
+                      const waveOffset = Math.sin((i / 30) * Math.PI * 2 + Date.now() / 200) * 0.3 + 0.7;
+                      intensity = (audioLevel / 100) * waveOffset;
+                      barHeight = Math.max(2, Math.min(32, 2 + (intensity * 30)));
+                    } else {
+                      barHeight = 2;
+                      intensity = 0;
+                    }
+                  }
+                  
+                  // 색상 계산 (부드러운 주황색 계열, 매우 덜 눈에 띄게)
+                  const hue = 25 + (intensity * 10); // 25-35 (부드러운 주황색)
+                  const saturation = 50 + (intensity * 15); // 50-65% (더 덜 진하게)
+                  const lightness = 60 + (intensity * 10); // 60-70% (더 밝게)
                   
                   return (
                     <div
                       key={i}
                       style={{
-                        width: '3px',
+                        width: '2px',
                         height: `${barHeight}px`,
-                        backgroundColor: audioLevel > 5 
-                          ? `hsl(${greenHue}, ${saturation}%, ${lightness}%)`
-                          : 'rgba(200, 255, 200, 0.3)',
-                        borderRadius: '2px',
-                        transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        alignSelf: 'flex-end'
+                        backgroundColor: intensity > 0.05 
+                          ? `hsla(${hue}, ${saturation}%, ${lightness}%, 0.65)`
+                          : 'rgba(251, 191, 36, 0.25)', // 주황색 계열
+                        borderRadius: '1px',
+                        transition: 'none',
+                        alignSelf: 'flex-end',
+                        boxShadow: intensity > 0.3 
+                          ? `0 0 ${intensity * 4}px hsla(${hue}, ${saturation}%, ${lightness}%, 0.4)`
+                          : 'none',
+                        willChange: 'height, background-color'
                       }}
                     />
                   );
@@ -1239,6 +1330,9 @@ const VideoInterview = () => {
                   }}>
                     {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                   </span>
+                  <span style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                    ({difficulty === 'easy' ? '초급' : difficulty === 'medium' ? '중급' : '고급'})
+                  </span>
                 </div>
               )}
             </div>
@@ -1273,24 +1367,28 @@ const VideoInterview = () => {
                 </div>
               )}
             </div>
-            {timeLeft !== null && (
-              <div style={{
-                width: '100%',
-                height: '4px',
-                backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                borderRadius: '2px',
-                marginBottom: '1rem',
-                overflow: 'hidden'
-              }}>
+            {timeLeft !== null && (() => {
+              // 난이도별 최대 시간 계산: 초급 120초, 중급 90초, 고급 60초
+              const maxTime = difficulty === 'easy' ? 120 : difficulty === 'medium' ? 90 : 60;
+              return (
                 <div style={{
-                  width: `${(timeLeft / 90) * 100}%`,
-                  height: '100%',
-                  backgroundColor: timeLeft <= 10 ? '#ef4444' : '#6366f1',
-                  transition: 'width 1s linear, background-color 0.3s ease',
-                  borderRadius: '2px'
-                }}></div>
-              </div>
-            )}
+                  width: '100%',
+                  height: '4px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                  borderRadius: '2px',
+                  marginBottom: '1rem',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${(timeLeft / maxTime) * 100}%`,
+                    height: '100%',
+                    backgroundColor: timeLeft <= 10 ? '#ef4444' : '#6366f1',
+                    transition: 'width 1s linear, background-color 0.3s ease',
+                    borderRadius: '2px'
+                  }}></div>
+                </div>
+              );
+            })()}
             
             {/* 답변 시도 횟수 표시 */}
             <div style={{
@@ -1357,7 +1455,16 @@ const VideoInterview = () => {
                     const attemptValue = Math.min(nextAttempt, 2);
                     setCurrentAttempt(attemptValue); // 최대 2로 제한
                     currentAttemptRef.current = attemptValue; // ref도 업데이트
-                    setTimeLeft(90); // 타이머 리셋
+                    // 난이도별 시간 제한: 초급 120초, 중급 90초, 고급 60초
+                    let timeLimit = 90; // 기본값 (중급)
+                    if (difficulty === 'easy') {
+                      timeLimit = 120; // 초급: 2분
+                    } else if (difficulty === 'medium') {
+                      timeLimit = 90; // 중급: 1분 30초
+                    } else if (difficulty === 'hard') {
+                      timeLimit = 60; // 고급: 1분
+                    }
+                    setTimeLeft(timeLimit); // 타이머 리셋
                     await startRecording();
                   }}
                   className="btn btn-secondary"
